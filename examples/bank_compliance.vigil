@@ -1,0 +1,8 @@
+// Данные с банковской тайной и PII
+stream applicant_data [level: secure, tags: pii, bank_secret]
+
+on applicant_data as client {
+    mask(client)
+    // Ошибка! Даже с маской bank_secret нельзя в public
+    transmit(client) to public_analytics [level: public]
+}

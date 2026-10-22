@@ -1,0 +1,6 @@
+// Политика безопасности для кредитного кабинета Альфа-Банка
+stream applicant_data [level: secure]
+
+on applicant_data as client {
+    mask(client)
+}

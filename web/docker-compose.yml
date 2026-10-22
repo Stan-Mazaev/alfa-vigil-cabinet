@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  vigil-app:
+    build: .
+    container_name: vigil-credit-cabinet
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

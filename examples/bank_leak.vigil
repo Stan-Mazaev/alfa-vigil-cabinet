@@ -1,0 +1,6 @@
+// ОШИБОЧНЫЙ СКРИПТ: Разработчик пытается слить данные клиента в паблик
+stream applicant_data [level: secure]
+
+on applicant_data as client {
+    transmit(client) to public_analytics [level: public]
+}

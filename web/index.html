@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Альфа-Кабинет | Vigil Engine</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f5f7; margin: 0; padding: 40px; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: grid; grid-template-columns: 1fr 1.2fr; gap: 30px; }
+        .left-panel { min-width: 0; }
+        .right-panel { min-width: 0; border-left: 2px dashed #ccc; padding-left: 30px; display: none; }
+        .logo { color: #ef3124; font-size: 24px; font-weight: bold; margin-bottom: 20px; text-align: center; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px;}
+        input[type="text"], input[type="number"], select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #ef3124; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: bold; margin-top: 10px;}
+        button:hover { background: #d0271c; }
+        .result { margin-top: 20px; padding: 15px; border-radius: 6px; display: none; font-size: 14px;}
+        .success { background: #e6f4ea; color: #1e8e3e; border: 1px solid #1e8e3e; }
+        .error { background: #fce8e6; color: #d93025; border: 1px solid #d93025; }
+        
+        /* Стили для лога ИБ */
+        .audit-title { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 10px; border-bottom: 2px solid #ef3124; padding-bottom: 5px; }
+        .log-item { font-family: monospace; font-size: 11px; padding: 6px; margin-bottom: 6px; border-radius: 4px; background: #f8f9fa; border-left: 3px solid #ccc; }
+        .log-INFO { border-left-color: #1e8e3e; color: #1e8e3e; background: #e6f4ea; }
+        .log-CRITICAL { border-left-color: #d93025; color: #d93025; background: #fce8e6; font-weight: bold; }
+        .log-time { color: #666; font-size: 9px; display: block; margin-bottom: 2px; }
+
+        /* Граф потоков данных */
+        .graph-container { margin-top: 15px; padding: 15px; background: #fafafa; border: 1px solid #ddd; border-radius: 8px; display: none; }
+        .graph-title { font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #555; text-align: center;}
+        .graph-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .node { padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; text-align: center; min-width: 80px; border: 2px solid; }
+        .node-secure { border-color: #d93025; color: #d93025; background: #fff; }
+        .node-internal { border-color: #f9ab00; color: #f9ab00; background: #fff; }
+        .node-public { border-color: #1e8e3e; color: #1e8e3e; background: #fff; }
+        .arrow { flex-grow: 1; height: 2px; background: #ccc; position: relative; margin: 0 10px; }
+        .arrow::after { content: '▶'; position: absolute; right: -5px; top: -7px; color: #ccc; font-size: 12px; }
+        .arrow-red { background: #d93025; }
+        .arrow-red::after { color: #d93025; }
+
+        /* Калькулятор */
+        .calc-box { margin-top: 15px; padding-top: 15px; border-top: 1px dashed #1e8e3e; }
+        .slider-container { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
+        input[type="range"] { flex-grow: 1; }
+        .calc-result { font-size: 13px; margin-top: 10px; font-weight: bold; }
+        
+        /* Таймлайн */
+        .timeline { margin-top: 15px; display: none; font-size: 13px;}
+        .step { display: flex; align-items: center; margin-bottom: 8px; color: #888; }
+        .step.active { color: #1e8e3e; font-weight: bold; }
+        .step.done { color: #333; }
+        .step-icon { width: 18px; height: 18px; border-radius: 50%; background: #ccc; margin-right: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 9px;}
+        .step.active .step-icon { background: #1e8e3e; }
+        .step.done .step-icon { background: #333; }
+
+        /* Vigil Code & AST */
+        .code-container { margin-top: 15px; }
+        .code-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .btn-small { padding: 4px 8px; font-size: 11px; background: #333; color: #fff; width: auto; margin: 0; border-radius: 4px; }
+        .btn-small:hover { background: #555; }
+        pre { 
+            margin: 0; 
+            background: #282c34; 
+            color: #abb2bf; 
+            padding: 10px; 
+            border-radius: 6px; 
+            font-size: 11px; /* <-- Уменьшили */
+            overflow-x: auto; 
+            white-space: pre-wrap; 
+            word-break: break-all;
+        }
+        .syntax-keyword { color: #c678dd; font-weight: bold; }
+        .syntax-string { color: #98c379; }
+        .syntax-level { color: #e06c75; }
+        .syntax-func { color: #61afef; }
+        
+        /* Модальное окно */
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        .modal-content { background: white; margin: 15% auto; padding: 20px; border-radius: 12px; width: 400px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .modal-icon { font-size: 50px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ЛЕВАЯ ПАНЕЛЬ: КЛИЕНТ -->
+        <div class="left-panel">
+            <div class="logo">АЛЬФА-БУДУЩЕЕ</div>
+            <h2>Заявка на кредит</h2>
+            <form id="loanForm">
+                <div class="form-group">
+                    <label>ИНН</label>
+                    <input type="text" id="inn" required placeholder="7700000000" maxlength="10">
+                    <button type="button" id="preApproveBtn" style="background:#1e8e3e; margin-top: 5px; padding: 6px; font-size: 12px; width: auto;">✨ Узнать мой предодобренный лимит</button>
+                    <div id="companyCard" style="display: none; margin-top: 10px; padding: 10px; border-radius: 6px; font-size: 12px; border: 1px solid #ccc; background: #f8f9fa;">
+                        <b>Статус ФНС:</b> <span id="fnsStatus"></span><br>
+                        <b>Директор:</b> <span id="fnsDirector"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Название компании (ИП/ООО)</label>
+                    <input type="text" id="company" required placeholder="ООО Ромашка">
+                </div>
+                <div class="form-group">
+                    <label>Цель финансирования</label>
+                    <select id="purpose" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+                        <option value="working_capital">Пополнение оборотных средств</option>
+                        <option value="equipment">Покупка оборудования / Инвестиции</option>
+                        <option value="cash_gap">Кассовый разрыв (Овердрафт)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Сумма кредита (руб.)</label>
+                    <input type="number" id="amount" required placeholder="500000">
+                </div>
+                <div class="form-group">
+                    <label>Роль в системе (тест ИБ)</label>
+                    <select id="role" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;">
+                        <option value="client">Клиент (МСП)</option>
+                        <option value="analyst">Сотрудник Аналитики (Банк)</option>
+                    </select>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" id="debugLeak" style="width: auto;">
+                    <label for="debugLeak" style="margin: 0; color: #d93025; font-weight: bold;">💀 Режим ошибки: Слить данные без маскировки</label>
+                </div>
+                <button type="submit">Отправить заявку</button>
+            </form>
+            
+            <div id="timeline" class="timeline">
+                <div class="step" id="step1"><div class="step-icon">1</div>Заявка получена</div>
+                <div class="step" id="step2"><div class="step-icon">2</div>Проверка Vigil (ИБ)</div>
+                <div class="step" id="step3"><div class="step-icon">3</div>Запрос в ФНС/БКИ</div>
+                <div class="step" id="step4"><div class="step-icon">4</div>Скоринг и решение</div>
+            </div>
+
+            <div id="result" class="result">
+                <div id="resultText"></div>
+                <div id="calculator" class="calc-box" style="display: none;">
+                    <label>Срок кредита (мес.): <span id="termVal">12</span></label>
+                    <div class="slider-container">
+                        <input type="range" id="termSlider" min="6" max="36" value="12" step="6">
+                    </div>
+                    <div class="calc-result">
+                        Ежемесячный платеж: <span id="monthlyPayment" style="color:#1e8e3e;">0 ₽</span><br>
+                        Общая переплата: <span id="overpayment" style="color:#d93025;">0 ₽</span>
+                    </div>
+                    <button type="button" onclick="signContract()" style="margin-top: 15px; background: #1e8e3e;">✍️ Подписать договор (ЭЦП)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ПРАВАЯ ПАНЕЛЬ: ПАНЕЛЬ ИБ -->
+        <div class="right-panel" id="securityPanel">
+            <div class="audit-title">💼 Рабочее место ИБ-офицера / Андеррайтера</div>
+            
+            <!-- ГРАФ ПОТОКОВ ДАННЫХ -->
+            <div class="graph-container" id="dataFlowGraph">
+                <div class="graph-title">Карта потоков данных (Vigil Runtime)</div>
+                <div class="graph-row">
+                    <div class="node" style="border:none; background:none;">Клиент</div>
+                    <div class="arrow" id="arrow1"></div>
+                    <div class="node node-secure">applicant_data<br><small>secure</small></div>
+                    <div class="arrow" id="arrow2"></div>
+                    <div class="node node-internal" id="nodeMask">mask()</div>
+                </div>
+                <div class="graph-row" style="margin-top:15px;">
+                    <div class="node node-internal">scoring_result<br><small>internal</small></div>
+                    <div class="arrow" id="arrow3"></div>
+                    <div class="node node-internal" id="nodeMask2">mask()</div>
+                    <div class="arrow" id="arrow4"></div>
+                    <div class="node node-public">public_response<br><small>public</small></div>
+                </div>
+            </div>
+
+            <div id="auditLogs" style="margin-top: 15px;"></div>
+
+            <!-- VIGIL CODE & AST -->
+            <div id="vigilCodeContainer" style="display: none;" class="code-container">
+                <div class="code-header">
+                    <div class="audit-title" style="font-size: 14px; border:none; margin:0;">💻 Выполняемый скрипт Vigil</div>
+                    <button class="btn-small" onclick="compileVigil()">▶ Скомпилировать</button>
+                </div>
+                <pre id="vigilCode"></pre>
+                <button class="btn-small" style="margin-top:5px; background:#555;" onclick="toggleAST()">Показать AST (JSON)</button>
+                <pre id="astView" style="display:none; max-height:200px; background:#1e1e1e; color:#d4d4d4; margin-top:5px;"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО ВЫДАЧИ -->
+    <div id="disburseModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-icon">✅</div>
+            <h2 style="color: #1e8e3e; margin-top:0;">Кредит выдан!</h2>
+            <p>Договор подписан ЭЦП.<br>Денежные средства зачислены на расчетный счет компании.</p>
+            <button onclick="closeModal()" style="background: #333;">Вернуться в кабинет</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. МАГИЯ ИНН ---
+        document.getElementById('inn').addEventListener('input', async (e) => {
+            const inn = e.target.value;
+            const card = document.getElementById('companyCard');
+            if (inn.length === 10) {
+                card.style.display = 'block';
+                card.innerHTML = '⏳ Запрос в ФНС...';
+                try {
+                    const res = await fetch(`/api/company-info?inn=${inn}`);
+                    const data = await res.json();
+                    document.getElementById('company').value = data.name;
+                    let color = data.risk_level === 'green' ? '#1e8e3e' : (data.risk_level === 'red' ? '#d93025' : '#f9ab00');
+                    card.style.borderLeft = `4px solid ${color}`;
+                    card.innerHTML = `<b>Компания:</b> ${data.name}<br><b>Статус:</b> ${data.status}<br><b>Директор:</b> ${data.director}`;
+                } catch (err) { card.style.display = 'none'; }
+            } else { card.style.display = 'none'; }
+        });
+
+        // --- 2. ПРЕДОДОБРЕННЫЙ ЛИМИТ ---
+        document.getElementById('preApproveBtn').addEventListener('click', async () => {
+            const inn = document.getElementById('inn').value;
+            if (inn.length !== 10) { alert("Введите корректный ИНН (10 цифр)"); return; }
+            const btn = document.getElementById('preApproveBtn');
+            btn.innerText = 'Загрузка...';
+            try {
+                const res = await fetch(`/api/pre-approved?inn=${inn}`);
+                const data = await res.json();
+                document.getElementById('amount').value = data.limit;
+                document.getElementById('purpose').value = 'working_capital';
+                btn.innerText = `✅ Вам доступно до ${data.limit.toLocaleString()} ₽`;
+            } catch (e) { btn.innerText = 'Ошибка'; }
+        });
+
+        // --- 3. КАЛЬКУЛЯТОР ---
+        let currentAmount = 0;
+        let currentRate = 0;
+
+        function calculateLoan() {
+            const months = parseInt(document.getElementById('termSlider').value);
+            document.getElementById('termVal').innerText = months;
+            if (currentAmount === 0) return;
+            const monthlyRate = (currentRate / 100) / 12;
+            const payment = currentAmount * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
+            const total = payment * months;
+            document.getElementById('monthlyPayment').innerText = Math.round(payment).toLocaleString() + ' ₽';
+            document.getElementById('overpayment').innerText = Math.round(total - currentAmount).toLocaleString() + ' ₽';
+        }
+        document.getElementById('termSlider').addEventListener('input', calculateLoan);
+
+        // --- 4. ПОДСВЕТКА СИНТАКСИСА VIGIL ---
+        function highlightVigil(code) {
+            // 1. Экранируем всё, включая кавычки (это спасет наши HTML-теги от поломки)
+            let escaped = code
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;");
+            
+            // 2. Красим ключевые слова, уровни и функции
+            return escaped
+                .replace(/\b(stream|on|as|transmit|to|level|allowed_roles)\b/g, '<span class="syntax-keyword">$1</span>')
+                .replace(/\b(secure|internal|public)\b/g, '<span class="syntax-level">$1</span>')
+                .replace(/\b(mask|alert)\b/g, '<span class="syntax-func">$1</span>')
+                // 3. Красим строки (теперь мы ищем именно &quot;, а не обычные кавычки, поэтому теги не сломаются)
+                .replace(/(&quot;.*?&quot;)/g, '<span class="syntax-string">$1</span>');
+        }
+
+        let currentAST = "";
+        window.toggleAST = function() {
+            const astEl = document.getElementById('astView');
+            if (astEl.style.display === 'none') {
+                astEl.innerText = currentAST;
+                astEl.style.display = 'block';
+            } else {
+                astEl.style.display = 'none';
+            }
+        };
+
+        window.compileVigil = function() {
+            const logDiv = document.getElementById('auditLogs');
+            const compileLog = document.createElement('div');
+            compileLog.className = 'log-item log-INFO';
+            compileLog.innerHTML = `<span class="log-time">Только что | VIGIL_COMPILER</span>[Успешно] AST построено. 0 ошибок. Проверено правил: 3.`;
+            
+            // Добавляем лог компиляции
+            logDiv.appendChild(compileLog);
+            
+            // Визуальный эффект мигания
+            const codeBlock = document.getElementById('vigilCode');
+            codeBlock.style.opacity = '0.5';
+            setTimeout(() => codeBlock.style.opacity = '1', 200);
+        };
+
+        // --- 5. ОТПРАВКА ЗАЯВКИ ---
+        document.getElementById('loanForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.querySelector('#loanForm button[type="submit"]');
+            const resDiv = document.getElementById('result');
+            const secPanel = document.getElementById('securityPanel');
+            const auditDiv = document.getElementById('auditLogs');
+            const graph = document.getElementById('dataFlowGraph');
+            const calcBox = document.getElementById('calculator');
+            
+            btn.innerText = 'Обработка...';
+            resDiv.style.display = 'none';
+            secPanel.style.display = 'none';
+            graph.style.display = 'none';
+            document.getElementById('vigilCodeContainer').style.display = 'none';
+            auditDiv.innerHTML = '';
+            
+            document.getElementById('timeline').style.display = 'block';
+            ['step1', 'step2', 'step3', 'step4'].forEach(id => {
+                const stepEl = document.getElementById(id);
+                stepEl.className = 'step';
+                stepEl.querySelector('.step-icon').innerText = id.replace('step', '');
+            });
+
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+            document.getElementById('step1').className = 'step active';
+            await sleep(300);
+            document.getElementById('step1').className = 'step done';
+            document.getElementById('step1').querySelector('.step-icon').innerText = '✓';
+            document.getElementById('step2').className = 'step active';
+            
+            const data = {
+                company: document.getElementById('company').value,
+                inn: document.getElementById('inn').value,
+                amount: parseInt(document.getElementById('amount').value),
+                purpose: document.getElementById('purpose').value,
+                role: document.getElementById('role').value,
+                debug_leak: document.getElementById('debugLeak').checked
+            };
+
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+                const response = await fetch('/api/apply', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                const result = await response.json();
+                
+                document.getElementById('step2').className = 'step done';
+                document.getElementById('step2').querySelector('.step-icon').innerText = '✓';
+                document.getElementById('step3').className = 'step active';
+                await sleep(300);
+                document.getElementById('step3').className = 'step done';
+                document.getElementById('step3').querySelector('.step-icon').innerText = '✓';
+                document.getElementById('step4').className = 'step active';
+                await sleep(200);
+                document.getElementById('step4').className = 'step done';
+                document.getElementById('step4').querySelector('.step-icon').innerText = '✓';
+
+                resDiv.style.display = 'block';
+                
+                if (response.ok) {
+                    if (result.error) {
+                        resDiv.className = 'result error';
+                        let actionBtn = result.suggested_amount ? `<button type="button" onclick="fixAmount(${result.suggested_amount})" style="margin-top:10px; background:#1e8e3e; width:auto; padding: 8px 15px;">Согласиться на ${result.suggested_amount.toLocaleString()} ₽</button>` : '';
+                        document.getElementById('resultText').innerHTML = `<b>❌ ${result.error}</b><br>${result.reason} ${actionBtn}`;
+                        calcBox.style.display = 'none';
+                    } else {
+                        resDiv.className = 'result success';
+                        document.getElementById('resultText').innerHTML = `<b>✅ ${result.reason}</b><br><br>
+                            <b>Продукт:</b> ${result.product_name}<br>
+                            <b>Сумма:</b> ${result.approved_amount.toLocaleString()} ₽<br>
+                            <b>Ставка:</b> ${result.rate}%`;
+                        
+                        currentAmount = result.approved_amount;
+                        currentRate = result.rate;
+                        calcBox.style.display = 'block';
+                        calculateLoan();
+                    }
+                } else {
+                    resDiv.className = 'result error';
+                    document.getElementById('resultText').innerHTML = `<b>🛑 ОШИБКА БЕЗОПАСНОСТИ:</b><br>${result.error}`;
+                    calcBox.style.display = 'none';
+                }
+
+                secPanel.style.display = 'block';
+                graph.style.display = 'block';
+                
+                if (!response.ok) {
+                    document.getElementById('arrow3').className = 'arrow arrow-red';
+                    document.getElementById('arrow4').className = 'arrow arrow-red';
+                } else {
+                    document.getElementById('arrow3').className = 'arrow';
+                    document.getElementById('arrow4').className = 'arrow';
+                }
+
+                if (result.audit_log) {
+                    result.audit_log.forEach(log => {
+                        const logEl = document.createElement('div');
+                        logEl.className = `log-item log-${log.severity}`;
+                        const time = new Date(log.timestamp).toLocaleTimeString();
+                        logEl.innerHTML = `<span class="log-time">${time} | ${log.rule}</span>${log.message}`;
+                        auditDiv.appendChild(logEl);
+                    });
+                }
+
+                // Отображение кода Vigil с подсветкой
+                if (result.vigil_code) {
+                    document.getElementById('vigilCodeContainer').style.display = 'block';
+                    document.getElementById('vigilCode').innerHTML = highlightVigil(result.vigil_code.trim()); // <-- именно innerHTML
+                    currentAST = result.ast_json || "AST не сгенерировано";
+                    document.getElementById('astView').style.display = 'none';
+                }
+
+            } catch (err) {
+                console.error(err);
+                resDiv.style.display = 'block';
+                resDiv.className = 'result error';
+                document.getElementById('resultText').innerHTML = `<b>🛑 Ошибка сети или таймаут</b><br>Сервер не ответил. Проверьте терминал.`;
+            } finally {
+                btn.innerText = 'Отправить заявку';
+            }
+        });
+
+        window.fixAmount = function(amount) {
+            document.getElementById('amount').value = amount;
+            document.querySelector('#loanForm button[type="submit"]').click();
+        };
+
+        // --- 6. МОДАЛКА ВЫДАЧИ КРЕДИТА ---
+        window.signContract = function() {
+            document.getElementById('disburseModal').style.display = 'block';
+        };
+        window.closeModal = function() {
+            document.getElementById('disburseModal').style.display = 'none';
+            // Очищаем форму для новой заявки
+            document.getElementById('loanForm').reset();
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('timeline').style.display = 'none';
+            document.getElementById('securityPanel').style.display = 'none';
+            document.getElementById('companyCard').style.display = 'none';
+        };
+    </script>
+</body>
+</html>
